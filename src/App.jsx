@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import profileImg from './assets/prof.jpeg';
 import {
   ArrowRight,
   MessageSquare,
@@ -79,7 +80,7 @@ function App() {
         <div className="hero-image-wrapper">
           <div className="hero-photo-container">
             <img
-              src="src\assets\prof.jpeg"
+              src={profileImg}
               alt="Manideep Chilukuri"
               className="hero-photo"
               onError={(e) => {
