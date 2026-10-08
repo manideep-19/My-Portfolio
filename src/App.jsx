@@ -1,211 +1,108 @@
-import React, { useState } from 'react';
-import profileImg from './assets/prof.jpeg';
-import {
-  ArrowRight,
-  MessageSquare,
-  Smartphone,
-  Database,
-  Activity
-} from 'lucide-react';
-import ProjectDetail from './ProjectDetail';
+import React, { useState, useEffect } from 'react';
+import Navbar from './components/Navbar';
+import Hero from './components/Hero';
+import About from './components/About';
+import TechStack from './components/TechStack';
+import FeaturedProjects from './components/FeaturedProjects';
+import OtherProjects from './components/OtherProjects';
+import FreelanceSection from './components/FreelanceSection';
+import Experience from './components/Experience';
+import Certifications from './components/Certifications';
+import Contact from './components/Contact';
+import Footer from './components/Footer';
+import ProjectModal from './components/ProjectModal';
+import TerminalDrawer from './components/TerminalDrawer';
 
-const flagshipProjects = [
-  {
-    title: "EqualVoice",
-    subtitle: "AI-Powered Comm Platform • Real-time Audio",
-    tech: ["React", "Node.js", "WebRTC", "TensorFlow", "Socket.io"],
-    desc: "A real-time AI communication platform enabling deaf, mute, and speech-impaired users to participate in live phone calls without speaking or hearing.",
-    detailedOverview: "EqualVoice is an AI-powered communication platform designed to provide real-time audio processing and translation. It bridges communication gaps by leveraging advanced machine learning models for speech recognition and generation.",
-    icon: <MessageSquare size={32} strokeWidth={2} />
-  },
-  {
-    title: "Circlify",
-    subtitle: "Virtual Fashion Try-On • Generative AI",
-    tech: ["Python", "PyTorch", "React Native", "AWS", "FastAPI"],
-    desc: "Universal AI-based virtual try-on platform allowing users to visualize clothing across e-commerce using generative AI pipelines.",
-    detailedOverview: "Circlify revolutionizes the e-commerce fashion industry by allowing users to virtually try on clothing. It uses generative AI to superimpose garments onto user photos with highly realistic physics and lighting.",
-    icon: <Smartphone size={32} strokeWidth={2} />
-  },
-  {
-    title: "NEXUS",
-    subtitle: "Project Management Platform • Cloud AI",
-    tech: ["Vue.js", "Go", "PostgreSQL", "Docker", "Kubernetes"],
-    desc: "Multi-tenant academic platform to manage capstone projects with AI-based Project Readiness Checks.",
-    detailedOverview: "Nexus is a comprehensive project management platform that integrates cloud AI to automate task assignment, predict project bottlenecks, and optimize resource allocation for large-scale enterprise teams.",
-    icon: <Database size={32} strokeWidth={2} />
-  },
-  {
-    title: "NFCura",
-    subtitle: "Healthcare Platform • NFC Integration",
-    tech: ["React", "Firebase", "Node.js", "NFC API", "Express"],
-    desc: "NFC-powered healthcare platform with role-based access for doctors, patients, and administrators.",
-    detailedOverview: "An advanced NFC-powered healthcare platform ensuring secure, role-based access for medical professionals, patients, and system administrators. Facilitates seamless real-time data synchronization and encrypted record management.",
-    icon: <Activity size={32} strokeWidth={2} />
-  }
-];
-
-function App() {
+export default function App() {
   const [selectedProject, setSelectedProject] = useState(null);
+  const [isTerminalOpen, setIsTerminalOpen] = useState(false);
 
-  // Prevent background scrolling when modal is open
-  React.useEffect(() => {
-    if (selectedProject) document.body.style.overflow = 'hidden';
-    else document.body.style.overflow = 'unset';
-    return () => { document.body.style.overflow = 'unset'; };
-  }, [selectedProject]);
+  // Prevent background scroll when modal or terminal drawer is active
+  useEffect(() => {
+    if (selectedProject || isTerminalOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [selectedProject, isTerminalOpen]);
+
+  // Global hotkey listener (press '~' or '`' to toggle terminal drawer)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.key === '`' || e.key === '~') && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
+        e.preventDefault();
+        setIsTerminalOpen((prev) => !prev);
+      }
+      if (e.key === 'Escape') {
+        if (selectedProject) setSelectedProject(null);
+        if (isTerminalOpen) setIsTerminalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedProject, isTerminalOpen]);
+
+  const handleSelectProject = (project) => {
+    setSelectedProject(project);
+  };
+
+  const handleCloseModal = () => {
+    setSelectedProject(null);
+  };
 
   return (
-    <div className="app">
-      {/* Navigation */}
-      <nav className="navbar">
-        <div className="logo">MC.</div>
-        <div className="nav-links">
-          <a href="#about" className="nav-item">About</a>
-          <a href="#work" className="nav-item">Work</a>
-          <a href="#contact" className="nav-item">Contact</a>
-        </div>
-      </nav>
+    <div className="portfolio-app">
+      {/* Sticky Top Navigation with Laser Scroll Indicator */}
+      <Navbar onToggleTerminal={() => setIsTerminalOpen(true)} />
 
-      {/* Hero */}
-      <section id="about" className="hero">
-        <div className="hero-content">
-          <h1 className="hero-title">
-            MANIDEEP<br />
-            CHILUKURI.
-          </h1>
-          <p className="hero-subtitle">
-            Software Developer focused on forging powerful intelligence and uncompromising human-centric design. Bridging AI engineering with intuitive web experiences.
-          </p>
-        </div>
-        <div className="hero-image-wrapper">
-          <div className="hero-photo-container">
-            <img
-              src={profileImg}
-              alt="Manideep Chilukuri"
-              className="hero-photo"
-              onError={(e) => {
-                e.target.style.display = 'none';
-                e.target.nextSibling.style.display = 'block';
-              }}
-            />
-            {/* Fallback if image not found */}
-            <div className="photo-placeholder-text" style={{ display: 'none' }}>
-              [IMAGE URL ERROR: src\assets\prof.jpg]
-            </div>
-          </div>
-        </div>
-      </section>
+      <main id="main-content">
+        {/* Clean, Impactful Hero Section */}
+        <Hero onToggleTerminal={() => setIsTerminalOpen(true)} />
 
-      {/* Experience */}
-      <section className="section container">
-        <h2 className="section-header">Experience</h2>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4rem' }}>
-          <div className="exp-block">
-            <div className="exp-date">2026</div>
-            <div>
-              <h3 className="exp-role">Flutter Developer Intern</h3>
-              <p style={{ fontFamily: 'var(--font-mono)', marginBottom: '1rem', fontWeight: 700, textTransform: 'uppercase' }}>Nexotech Solutions | Remote</p>
-              <p className="exp-desc">
-                Contributed as a Flutter Developer Intern, building and shipping cross-platform mobile features.
-                Gained hands-on experience with Flutter development in a professional remote environment during the tenure from March to April 2026.
-              </p>
-            </div>
-          </div>
+        {/* About Section & Lifecycle Workflow */}
+        <About />
 
-          <div className="exp-block">
-            <div className="exp-date">2025</div>
-            <div>
-              <h3 className="exp-role">Flutter Developer (Freelance)</h3>
-              <p style={{ fontFamily: 'var(--font-mono)', marginBottom: '1rem', fontWeight: 700, textTransform: 'uppercase' }}>Proofbox App | Remote</p>
-              <p className="exp-desc">
-                Developed an application to store and track the invoices,warranties and coupons using Dart and Firebase.
-              </p>
-            </div>
-          </div>
+        {/* Technical Competencies Stack */}
+        <TechStack />
 
-          <div className="exp-block">
-            <div className="exp-date">2024</div>
-            <div>
-              <h3 className="exp-role">Hackathon Participant</h3>
-              <p style={{ fontFamily: 'var(--font-mono)', marginBottom: '1rem', fontWeight: 700, textTransform: 'uppercase' }}>Metadome AI</p>
-              <p className="exp-desc">
-                Built an AI-powered web app integrating Face-API.js and React.js dynamically adapting explanations based on real-time expression detection.
-              </p>
-            </div>
-          </div>
-          <div className="exp-block">
-            <div className="exp-date">2025</div>
-            <div>
-              <h3 className="exp-role">Hackathon Participant</h3>
-              <p style={{ fontFamily: 'var(--font-mono)', marginBottom: '1rem', fontWeight: 700, textTransform: 'uppercase' }}>Recurzive v2</p>
-              <p className="exp-desc">
-                Built an an AI tool that analyzes GitHub repositories to generate documentation, visualize dependencies, and provide quick project insights.
-              </p>
-            </div>
-          </div>
+        {/* Flagship Featured Projects */}
+        <FeaturedProjects onSelectProject={handleSelectProject} />
 
-          <div className="exp-block">
-            <div className="exp-date">2023</div>
-            <div>
-              <h3 className="exp-role">Software Dev Intern</h3>
-              <p style={{ fontFamily: 'var(--font-mono)', marginBottom: '1rem', fontWeight: 700, textTransform: 'uppercase' }}>Cricentech Infosystem | Bengaluru</p>
-              <p className="exp-desc">
-                Led development of an E-Commerce platform and an AI conversational chatbot.
-                Architected full-stack solutions and shipped production-ready features utilizing modern web frameworks and cloud infrastructure.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
+        {/* Dedicated Freelance Section */}
+        <FreelanceSection onSelectProject={handleSelectProject} />
 
-      {/* Projects */}
-      <section id="work" className="section container" style={{ borderBottom: 'none' }}>
-        <h2 className="section-header">Flagship Projects</h2>
+        {/* Secondary Specialized Projects */}
+        <OtherProjects onSelectProject={handleSelectProject} />
 
-        <div className="projects-grid">
-          {flagshipProjects.map((project, idx) => (
-            <div key={idx} className="project-card mechanical-box">
-              <div className="project-header">
-                <div className="proj-icon-wrapper">
-                  {project.icon}
-                </div>
-                <div className="proj-num">0{idx + 1}</div>
-              </div>
-              <h3 className="proj-title">{project.title}</h3>
-              <p className="proj-desc">{project.desc}</p>
-              <button className="proj-link-btn" onClick={() => setSelectedProject(project)}>
-                KNOW MORE <ArrowRight size={16} style={{ display: 'inline', verticalAlign: 'middle', marginLeft: '4px' }} />
-              </button>
-            </div>
-          ))}
-        </div>
-      </section>
+        {/* Professional Experience Timeline */}
+        <Experience />
 
-      {/* Contact & Footer */}
-      <section id="contact" className="contact-section">
-        <h2 className="contact-hug">Let's build<br />together.</h2>
-        <div className="contact-links">
-          <a href="mailto:manideepchilukuri1@gmail.com" className="contact-link">
-            Email
-          </a>
-          <a href="https://linkedin.com/in/manideep-chilukuri-1a7952256" target="_blank" rel="noreferrer" className="contact-link">
-            LinkedIn
-          </a>
-          <a href="https://github.com/manideep-19" target="_blank" rel="noreferrer" className="contact-link">
-            GitHub
-          </a>
-        </div>
-      </section>
+        {/* Achievements & Certifications */}
+        <Certifications />
 
-      <footer>
-        <div>© {new Date().getFullYear()} Manideep Chilukuri</div>
-        <div>Engineered with React</div>
-      </footer>
+        {/* Contact Section */}
+        <Contact />
+      </main>
 
-      {/* Project Details Modal */}
-      <ProjectDetail project={selectedProject} onClose={() => setSelectedProject(null)} />
+      {/* Footer */}
+      <Footer />
+
+      {/* Case Study & Deep Dive Modal */}
+      {selectedProject && (
+        <ProjectModal
+          project={selectedProject}
+          onClose={handleCloseModal}
+        />
+      )}
+
+      {/* Interactive Developer CLI Terminal Drawer */}
+      <TerminalDrawer
+        isOpen={isTerminalOpen}
+        onClose={() => setIsTerminalOpen(false)}
+      />
     </div>
   );
 }
-
-export default App;
