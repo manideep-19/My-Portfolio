@@ -1,267 +1,213 @@
-import React, { useState, useEffect } from 'react';
-import {
-  ArrowDown,
-  Github,
-  Linkedin,
-  Mail,
-  Code2,
-  Cpu,
-  Layers,
-  Terminal,
-  Activity,
-  Radio
-} from 'lucide-react';
-import profileImg from '../assets/prof.jpeg';
+import { useEffect, useId, useRef } from 'react';
+import { ArrowUpRight, MousePointer2 } from 'lucide-react';
+import portraitArt from '../assets/prof-illustrated.webp';
+import portraitPhoto from '../assets/prof-photo.webp';
 import { personalInfo } from '../data/projects';
-import { sound } from '../utils/soundEngine';
 
-const rotatingTitles = [
-  "Full Stack Developer",
-  "Backend & Cloud Architect",
-  "AI & IoT Product Builder",
-  "Co-Founder & CTO @ NFCura",
-  "Mobile Application Engineer"
-];
+// Cursor-wipe tuning (same feel as the GSAP version, animated by hand — no extra dependency)
+const EFFECT = {
+  smoothing: 0.1,   // how lazily the brush follows the cursor
+  threshold: 0.5,   // min movement (px/frame) before ink is stamped
+  speedSize: 0.22,  // brush radius per px of movement
+  minRadius: 14,
+  growth: 2,        // blob grows to radius * growth…
+  growFor: 2,       // …over this many seconds
+  shrinkFor: 3      // …then shrinks away over this many
+};
 
-export default function Hero({ onToggleTerminal }) {
-  const [titleIndex, setTitleIndex] = useState(0);
-  const [displayText, setDisplayText] = useState('');
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [typingSpeed, setTypingSpeed] = useState(100);
+const easeInOut = (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
+const easeIn3 = (t) => t * t * t;
 
-  // Typewriter effect
+export default function Hero() {
+  const { firstName, role, intro, stats } = personalInfo;
+  const panelRef = useRef(null);
+  const svgRef = useRef(null);
+  const inkRef = useRef(null);
+  const hintRef = useRef(null);
+  const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
+  const filterId = `wipe-filter-${uid}`;
+  const maskId = `wipe-mask-${uid}`;
+
   useEffect(() => {
-    const current = rotatingTitles[titleIndex];
-    let timer;
+    const panel = panelRef.current;
+    const svg = svgRef.current;
+    const ink = inkRef.current;
+    if (!panel || !svg || !ink) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
-    if (isDeleting) {
-      if (displayText === '') {
-        timer = setTimeout(() => {
-          setIsDeleting(false);
-          setTitleIndex((prev) => (prev + 1) % rotatingTitles.length);
-          setTypingSpeed(100);
-        }, 350);
-      } else {
-        timer = setTimeout(() => {
-          setDisplayText((prev) => prev.slice(0, -1));
-          setTypingSpeed(40);
-        }, typingSpeed);
+    const target = { x: 0, y: 0 };
+    const current = { x: 0, y: 0 };
+    const stamps = [];
+    let active = false;
+    let frame = 0;
+    let demoUntil = 0;
+    let visible = true;
+    // the loop only runs while the hero is on screen and something is moving
+    const kick = () => { if (!frame && visible) frame = requestAnimationFrame(tick); };
+
+    const setPoint = (x, y) => {
+      if (!active) {
+        current.x = target.x = x;
+        current.y = target.y = y;
+        active = true;
+        return;
       }
-    } else {
-      if (displayText === current) {
-        timer = setTimeout(() => setIsDeleting(true), 2200);
-      } else {
-        timer = setTimeout(() => {
-          setDisplayText((prev) => current.slice(0, prev.length + 1));
-          setTypingSpeed(90);
-        }, typingSpeed);
+      target.x = x;
+      target.y = y;
+    };
+
+    const onPointer = (e) => {
+      demoUntil = 0; // real input takes over from the intro sweep
+      hintRef.current?.classList.add('is-hidden');
+      const b = panel.getBoundingClientRect();
+      setPoint(e.clientX - b.left, e.clientY - b.top);
+      kick();
+    };
+
+    const resize = () => {
+      svg.setAttribute('width', panel.clientWidth);
+      svg.setAttribute('height', panel.clientHeight);
+    };
+
+    const stamp = (x, y, r) => {
+      if (stamps.length > 160) return; // cap the ink so the blur filter stays cheap
+      const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      c.setAttribute('cx', x);
+      c.setAttribute('cy', y);
+      c.setAttribute('r', r);
+      c.setAttribute('fill', 'white');
+      ink.prepend(c);
+      stamps.push({ c, r, born: performance.now() });
+    };
+
+    const start = performance.now();
+    demoUntil = start + 2600;
+
+    function tick(now) {
+      frame = 0;
+      // Intro: a short automatic sweep across the portrait so visitors discover the effect
+      if (now < demoUntil) {
+        const t = (now - start) / 2600;
+        const w = panel.clientWidth;
+        const h = panel.clientHeight;
+        setPoint(w * (0.3 + 0.4 * t), h * (0.42 + 0.12 * Math.sin(t * Math.PI * 3)));
       }
+
+      if (active) {
+        current.x += (target.x - current.x) * EFFECT.smoothing;
+        current.y += (target.y - current.y) * EFFECT.smoothing;
+        const speed = Math.hypot(target.x - current.x, target.y - current.y);
+        if (speed > EFFECT.threshold) {
+          stamp(current.x, current.y, Math.max(EFFECT.minRadius, speed * EFFECT.speedSize));
+        }
+      }
+
+      for (let i = stamps.length - 1; i >= 0; i--) {
+        const s = stamps[i];
+        const age = (now - s.born) / 1000;
+        let r;
+        if (age < EFFECT.growFor) {
+          r = s.r + s.r * (EFFECT.growth - 1) * easeInOut(age / EFFECT.growFor);
+        } else if (age < EFFECT.growFor + EFFECT.shrinkFor) {
+          r = s.r * EFFECT.growth * (1 - easeIn3((age - EFFECT.growFor) / EFFECT.shrinkFor));
+        } else {
+          s.c.remove();
+          stamps.splice(i, 1);
+          continue;
+        }
+        s.c.setAttribute('r', r.toFixed(1));
+      }
+
+      const settled = Math.hypot(target.x - current.x, target.y - current.y) < 0.5;
+      if (now < demoUntil || stamps.length || !settled) kick();
     }
 
-    return () => clearTimeout(timer);
-  }, [displayText, isDeleting, titleIndex, typingSpeed]);
+    resize();
+    const ro = new ResizeObserver(resize);
+    ro.observe(panel);
+    panel.addEventListener('pointermove', onPointer);
+    panel.addEventListener('pointerdown', onPointer);
+    const io = new IntersectionObserver(([entry]) => {
+      visible = entry.isIntersecting;
+      if (visible) kick();
+      else { cancelAnimationFrame(frame); frame = 0; }
+    });
+    io.observe(panel);
+    kick();
+
+    return () => {
+      cancelAnimationFrame(frame);
+      ro.disconnect();
+      io.disconnect();
+      panel.removeEventListener('pointermove', onPointer);
+      panel.removeEventListener('pointerdown', onPointer);
+      ink.replaceChildren();
+    };
+  }, []);
 
   return (
-    <>
-      <section id="hero" className="hero-section">
-        <div className="hero-grid container">
-          {/* Left Column: Core Positioning & CTAs */}
-          <div className="hero-text-col">
-            <div
-              className="hero-role-tag"
-              onClick={() => {
-                sound.playClick();
-                if (onToggleTerminal) onToggleTerminal();
-              }}
-              title="Click to launch Developer CLI"
-            >
-              <span className="live-dot" />
-              <Terminal size={14} className="text-orange" />
-              <span className="role-text">
-                &gt;_ {displayText}
-                <span className="blinking-cursor">|</span>
-              </span>
-            </div>
+    <section id="top" className="hero">
+      <div className="hero__panel" ref={panelRef}>
+        {/* Layer 1 — illustrated portrait on orange (default view) */}
+        <div className="hero__layer hero__layer--front">
+          <h1 className="hero__name" aria-label={personalInfo.name}>{firstName}</h1>
+          <img
+            className="hero__portrait"
+            src={portraitArt}
+            alt="Illustrated portrait of Manideep Chilukuri"
+            width="793"
+            height="873"
+            fetchPriority="high"
+          />
+        </div>
 
-            <h1 className="hero-headline">
-              BUILDING PRODUCTS WHERE SOFTWARE MEETS{' '}
-              <span className="text-orange">AI, CLOUD &amp; HARDWARE.</span>
-            </h1>
+        {/* Layer 2 — real photo, revealed by the cursor */}
+        <div className="hero__layer hero__layer--back" style={{ mask: `url(#${maskId})`, WebkitMask: `url(#${maskId})` }} aria-hidden="true">
+          <span className="hero__name hero__name--back">{firstName}</span>
+          <p className="hero__secret">
+            Code by day.<br />Circuits by <em>night.</em>
+          </p>
+          <img className="hero__portrait hero__portrait--photo" src={portraitPhoto} alt="" width="793" height="873" />
+        </div>
 
-            <p className="hero-subtext">
-              {personalInfo.heroSubtext}
-            </p>
+        <svg ref={svgRef} className="hero__wipe" aria-hidden="true">
+          <defs>
+            <filter id={filterId}>
+              <feGaussianBlur in="SourceGraphic" stdDeviation="22" />
+              <feColorMatrix type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 60 -14" />
+            </filter>
+            <mask id={maskId}>
+              <g ref={inkRef} filter={`url(#${filterId})`} />
+            </mask>
+          </defs>
+        </svg>
 
-            {/* Core Strengths Chips */}
-            <div className="hero-strengths">
-              <span
-                className="strength-chip"
-                onMouseEnter={() => sound.playHover()}
-              >
-                <Layers size={13} className="text-orange" /> Full Stack &amp; Backend
-              </span>
-              <span
-                className="strength-chip"
-                onMouseEnter={() => sound.playHover()}
-              >
-                <Code2 size={13} className="text-orange" /> Mobile Apps (Flutter/Android)
-              </span>
-              <span
-                className="strength-chip"
-                onMouseEnter={() => sound.playHover()}
-              >
-                <Activity size={13} className="text-orange" /> AI Systems &amp; APIs
-              </span>
-              <span
-                className="strength-chip"
-                onMouseEnter={() => sound.playHover()}
-              >
-                <Cpu size={13} className="text-orange" /> Connected IoT &amp; NFC
-              </span>
-            </div>
+        {/* UI that stays on top of both layers */}
+        <p className="hero__eyebrow">{role} · Bangalore</p>
+        <span className="hero__hint" ref={hintRef}><MousePointer2 size={13} /> Move your cursor</span>
 
-            {/* Prominent CTAs */}
-            <div className="hero-cta-group">
-              <a
-                href="#featured-projects"
-                className="btn-primary"
-                onClick={() => sound.playClick()}
-                onMouseEnter={() => sound.playHover()}
-              >
-                <span>View Projects</span>
-                <ArrowDown size={16} />
-              </a>
+        <a href="#contact" className="hero__talk" aria-label="Let's talk">
+          <ArrowUpRight size={20} />
+          <span>Let's<br />talk</span>
+        </a>
 
-              <a
-                href="#contact"
-                className="btn-secondary"
-                onClick={() => sound.playClick()}
-                onMouseEnter={() => sound.playHover()}
-              >
-                <Mail size={16} />
-                <span>Contact Me</span>
-              </a>
-
-              <button
-                type="button"
-                className="btn-secondary btn-cli-hero"
-                onClick={() => {
-                  sound.playClick();
-                  if (onToggleTerminal) onToggleTerminal();
-                }}
-                onMouseEnter={() => sound.playHover()}
-                title="Launch in-browser interactive terminal"
-              >
-                <Terminal size={15} className="text-orange" />
-                <span>Launch CLI</span>
-              </button>
-
-              <a
-                href={personalInfo.socials.github}
-                target="_blank"
-                rel="noreferrer"
-                className="btn-icon-link"
-                title="GitHub Profile"
-                aria-label="GitHub Profile"
-                onClick={() => sound.playClick()}
-                onMouseEnter={() => sound.playHover()}
-              >
-                <Github size={18} />
-                <span>GitHub</span>
-              </a>
-
-              <a
-                href={personalInfo.socials.linkedin}
-                target="_blank"
-                rel="noreferrer"
-                className="btn-icon-link"
-                title="LinkedIn Profile"
-                aria-label="LinkedIn Profile"
-                onClick={() => sound.playClick()}
-                onMouseEnter={() => sound.playHover()}
-              >
-                <Linkedin size={18} />
-                <span>LinkedIn</span>
-              </a>
-            </div>
-
-            {/* Quick Stats Banner */}
-            <div className="hero-telemetry-banner mechanical-box">
-              <div className="telemetry-item">
-                <span className="telemetry-num">4+</span>
-                <span className="telemetry-label">Production Apps</span>
-              </div>
-              <div className="telemetry-divider" />
-              <div className="telemetry-item">
-                <span className="telemetry-num">&lt;200ms</span>
-                <span className="telemetry-label">SOS Dispatch Speed</span>
-              </div>
-              <div className="telemetry-divider" />
-              <div className="telemetry-item">
-                <span className="telemetry-num">CTO</span>
-                <span className="telemetry-label">Healthcare Co-Founder</span>
-              </div>
-              <div className="telemetry-divider" />
-              <div className="telemetry-item telemetry-status-live">
-                <Radio size={16} className="telemetry-radio-icon text-orange" />
-                <span className="telemetry-label">LIVE DEPLOYED</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column: Seamless Portrait Image */}
-          <div className="hero-visual-col">
-            <div className="hero-photo-wrapper">
-              <img
-                src={profileImg}
-                alt="Manideep Chilukuri - Full Stack Developer & AI/IoT Product Builder"
-                className="hero-photo"
-                loading="eager"
-              />
-            </div>
+        <div className="hero__bottom">
+          <h2 className="hero__headline">
+            Building products<br />people <em>actually</em> use.
+          </h2>
+          <div className="hero__meta">
+            <p>{intro}</p>
+            <ul className="hero__stats">
+              {stats.map((s) => (
+                <li key={s.label}>
+                  <strong>{s.value}</strong>
+                  <span>{s.label}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
-      </section>
-
-      {/* Kinetic Marquee Ticker 1: Leftward Scroll */}
-      <div className="ticker-strip ticker-primary" aria-hidden="true">
-        <div className="ticker-inner">
-          <span className="ticker-item"><span className="ticker-star">★</span> FULL STACK ARCHITECTURE</span>
-          <span className="ticker-item"><span className="ticker-star">★</span> NFCURA 3-APP HEALTHCARE ECOSYSTEM (CO-FOUNDER &amp; CTO)</span>
-          <span className="ticker-item"><span className="ticker-star">★</span> NAZR MISSION-CRITICAL WOMEN SAFETY APP</span>
-          <span className="ticker-item"><span className="ticker-star">★</span> INTOBUDDY FLUTTER NETWORKING &amp; RADAR</span>
-          <span className="ticker-item"><span className="ticker-star">★</span> PROOFBOX DOCUMENT VAULT &amp; RAZORPAY</span>
-          <span className="ticker-item"><span className="ticker-star">★</span> ESP32 &amp; CONNECTED HARDWARE</span>
-          <span className="ticker-item"><span className="ticker-star">★</span> SUB-200MS REAL-TIME DISPATCH</span>
-          <span className="ticker-item"><span className="ticker-star">★</span> FULL STACK ARCHITECTURE</span>
-          <span className="ticker-item"><span className="ticker-star">★</span> NFCURA 3-APP HEALTHCARE ECOSYSTEM (CO-FOUNDER &amp; CTO)</span>
-          <span className="ticker-item"><span className="ticker-star">★</span> NAZR MISSION-CRITICAL WOMEN SAFETY APP</span>
-          <span className="ticker-item"><span className="ticker-star">★</span> INTOBUDDY FLUTTER NETWORKING &amp; RADAR</span>
-          <span className="ticker-item"><span className="ticker-star">★</span> PROOFBOX DOCUMENT VAULT &amp; RAZORPAY</span>
-          <span className="ticker-item"><span className="ticker-star">★</span> ESP32 &amp; CONNECTED HARDWARE</span>
-          <span className="ticker-item"><span className="ticker-star">★</span> SUB-200MS REAL-TIME DISPATCH</span>
-        </div>
       </div>
-
-      {/* Kinetic Marquee Ticker 2: Rightward Scroll */}
-      <div className="ticker-strip ticker-secondary" aria-hidden="true">
-        <div className="ticker-inner ticker-reverse">
-          <span className="ticker-item"><span className="ticker-star">⚡</span> LATENCY: &lt;200MS</span>
-          <span className="ticker-item"><span className="ticker-star">⚡</span> NFC ISO/IEC 14443</span>
-          <span className="ticker-item"><span className="ticker-star">⚡</span> CRYPTO: ECDSA P-256</span>
-          <span className="ticker-item"><span className="ticker-star">⚡</span> FLUTTER 3.X MOBILE</span>
-          <span className="ticker-item"><span className="ticker-star">⚡</span> ABDM &amp; FHIR R4 COMPLIANT</span>
-          <span className="ticker-item"><span className="ticker-star">⚡</span> RAZORPAY &amp; HUBBLE SDK</span>
-          <span className="ticker-item"><span className="ticker-star">⚡</span> REALTIME FIRESTORE &amp; NODE.JS</span>
-          <span className="ticker-item"><span className="ticker-star">⚡</span> LATENCY: &lt;200MS</span>
-          <span className="ticker-item"><span className="ticker-star">⚡</span> NFC ISO/IEC 14443</span>
-          <span className="ticker-item"><span className="ticker-star">⚡</span> CRYPTO: ECDSA P-256</span>
-          <span className="ticker-item"><span className="ticker-star">⚡</span> FLUTTER 3.X MOBILE</span>
-          <span className="ticker-item"><span className="ticker-star">⚡</span> ABDM &amp; FHIR R4 COMPLIANT</span>
-          <span className="ticker-item"><span className="ticker-star">⚡</span> RAZORPAY &amp; HUBBLE SDK</span>
-          <span className="ticker-item"><span className="ticker-star">⚡</span> REALTIME FIRESTORE &amp; NODE.JS</span>
-        </div>
-      </div>
-    </>
+    </section>
   );
 }
